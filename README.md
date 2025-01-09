@@ -9,6 +9,8 @@ A real-time American Sign Language (ASL) letter detection system using OpenCV an
 - Visual feedback with hand landmarks
 - Display of finger angles and normalized values
 - Mirrored display for intuitive interaction
+- Web interface for easy access
+- Support for all 26 ASL alphabet letters
 
 ## Prerequisites
 
@@ -25,39 +27,51 @@ cd OpenCV-ASL-Reader
 
 2. Install the required dependencies:
 ```bash
-pip install opencv-python mediapipe numpy scikit-learn
+pip install -r requirements.txt
 ```
 
 ## Usage
 
-1. Run the ASL Reader:
+There are two ways to run the ASL Reader:
+
+### 1. Web Interface (Recommended)
+1. Start the web server:
 ```bash
-python asl-reader.py
+python app.py
+```
+2. Open your web browser and navigate to:
+```
+http://localhost:5000
+```
+3. The webcam feed will start automatically in your browser
+
+### 2. Terminal Application
+1. Run the standalone application:
+```bash
+python asl_reader.py
 ```
 
-2. Position your hand in front of the camera
-3. Make ASL letter gestures
-4. The program will display:
-   - Hand landmarks
-   - Finger angles
-   - Normalized values
-   - Predicted ASL letter (when confidence is high enough)
-5. Press 'q' to quit the application
+In both versions, the application will:
+- Display hand landmarks
+- Show finger angles and normalized values
+- Predict and display ASL letters in real-time
+- Press 'q' to quit (terminal version only)
 
-## Current Limitations
+## Current Features
 
-- Limited to basic ASL letters (A, B, C)
-- Requires good lighting conditions
-- Single hand detection only
-- Basic pattern matching system
+- Supports all 26 letters of the ASL alphabet
+- Real-time detection and visualization
+- User-friendly web interface
+- Detailed angle measurements and normalization
+- Mirrored display for intuitive interaction
 
 ## Future Improvements
 
-- Expand letter recognition to full ASL alphabet
 - Implement machine learning for better accuracy
 - Add support for dynamic gestures
 - Improve robustness in various lighting conditions
 - Add word and sentence recognition
+- Add tutorial mode for learning ASL
 
 ## Contributing
 

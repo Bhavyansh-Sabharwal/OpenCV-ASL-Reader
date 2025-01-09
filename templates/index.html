@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASL Reader</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        .video-container {
+            margin: 20px auto;
+            max-width: 800px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        #video-feed {
+            width: 100%;
+            max-width: 640px;
+            border-radius: 5px;
+        }
+
+        .error-message {
+            color: #721c24;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .instructions {
+            margin: 20px auto;
+            max-width: 600px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: left;
+        }
+
+        .instructions h2 {
+            color: #444;
+            margin-bottom: 15px;
+        }
+
+        .instructions ul {
+            padding-left: 20px;
+        }
+
+        .instructions li {
+            margin-bottom: 10px;
+            color: #666;
+        }
+
+        #start-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        #start-button:hover {
+            background-color: #45a049;
+        }
+
+        .loading {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .retry-button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .retry-button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ASL Reader - Real-time Sign Language Detection</h1>
+        
+        <div class="video-container">
+            <div id="error-message" class="error-message">
+                Camera access is required for this application to work. Please check your camera permissions and try again.
+            </div>
+            <button id="start-button">Start Camera</button>
+            <button id="retry-button" class="retry-button">Retry Connection</button>
+            <div class="loading" id="loading">Initializing camera...</div>
+            <img id="video-feed" src="" alt="ASL Detection Feed" style="display: none;">
+        </div>
+
+        <div class="instructions">
+            <h2>How to Use</h2>
+            <ul>
+                <li>Position your hand clearly in front of your camera</li>
+                <li>Make ASL letter gestures with your right hand</li>
+                <li>Hold the gesture steady for better recognition</li>
+                <li>The detected letter will appear above the hand gesture</li>
+                <li>Ensure good lighting for better detection</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const videoFeed = document.getElementById('video-feed');
+            const errorMessage = document.getElementById('error-message');
+            const startButton = document.getElementById('start-button');
+            const retryButton = document.getElementById('retry-button');
+            const loading = document.getElementById('loading');
+
+            // Get the current port from the window location
+            const port = window.location.port || '8080';
+            const baseUrl = `${window.location.protocol}//${window.location.hostname}:${port}`;
+            
+            let streamActive = false;
+
+            // Check if the browser supports getUserMedia
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                errorMessage.textContent = 'Your browser does not support camera access.';
+                errorMessage.style.display = 'block';
+                return;
+            }
+
+            // Function to check camera status
+            async function checkCamera() {
+                try {
+                    const response = await fetch(`${baseUrl}/check_camera`);
+                    const data = await response.json();
+                    return data.status === 'ok';
+                } catch (error) {
+                    console.error('Error checking camera:', error);
+                    return false;
+                }
+            }
+
+            // Function to start the video feed
+            async function startVideoFeed() {
+                loading.style.display = 'block';
+                startButton.style.display = 'none';
+                retryButton.style.display = 'none';
+                errorMessage.style.display = 'none';
+                
+                try {
+                    // Request camera permission
+                    await navigator.mediaDevices.getUserMedia({ video: true });
+                    
+                    // Check if backend camera is working
+                    const cameraOk = await checkCamera();
+                    
+                    if (cameraOk) {
+                        // Create a new image element each time
+                        const newVideoFeed = document.createElement('img');
+                        newVideoFeed.id = 'video-feed';
+                        newVideoFeed.style.width = '100%';
+                        newVideoFeed.style.maxWidth = '640px';
+                        newVideoFeed.style.borderRadius = '5px';
+                        
+                        // Replace old video feed if it exists
+                        const oldVideoFeed = document.getElementById('video-feed');
+                        if (oldVideoFeed) {
+                            oldVideoFeed.parentNode.removeChild(oldVideoFeed);
+                        }
+                        
+                        // Add the new video feed
+                        document.querySelector('.video-container').appendChild(newVideoFeed);
+                        
+                        // Set up error handling for the new video feed
+                        newVideoFeed.onerror = handleVideoError;
+                        
+                        // Start the stream with a timestamp to prevent caching
+                        newVideoFeed.src = `${baseUrl}/video_feed?t=${Date.now()}`;
+                        newVideoFeed.style.display = 'block';
+                        streamActive = true;
+                    } else {
+                        throw new Error('Could not initialize camera');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    handleVideoError();
+                } finally {
+                    loading.style.display = 'none';
+                }
+            }
+
+            function handleVideoError() {
+                streamActive = false;
+                errorMessage.textContent = 'Could not access camera. Please check your permissions and try again.';
+                errorMessage.style.display = 'block';
+                retryButton.style.display = 'block';
+                const videoFeed = document.getElementById('video-feed');
+                if (videoFeed) {
+                    videoFeed.style.display = 'none';
+                }
+            }
+
+            // Show start button initially
+            startButton.style.display = 'block';
+            startButton.addEventListener('click', startVideoFeed);
+            retryButton.addEventListener('click', startVideoFeed);
+
+            // Periodically check if the stream is still active
+            setInterval(() => {
+                if (streamActive) {
+                    const videoFeed = document.getElementById('video-feed');
+                    if (videoFeed && !videoFeed.complete) {
+                        handleVideoError();
+                    }
+                }
+            }, 5000);
+        });
+    </script>
+</body>
+</html> 
