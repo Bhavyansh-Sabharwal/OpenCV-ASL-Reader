@@ -119,6 +119,30 @@
         .retry-button:hover {
             background-color: #0056b3;
         }
+
+        #backend-url-input {
+            width: 100%;
+            max-width: 500px;
+            padding: 8px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .backend-status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .backend-status.connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .backend-status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
     </style>
 </head>
 <body>
@@ -129,6 +153,8 @@
             <div id="error-message" class="error-message">
                 Camera access is required for this application to work. Please check your camera permissions and try again.
             </div>
+            <input type="text" id="backend-url-input" placeholder="Enter backend URL (e.g., https://your-backend.herokuapp.com)">
+            <div id="backend-status" class="backend-status disconnected">Backend: Disconnected</div>
             <button id="start-button">Start Camera</button>
             <button id="retry-button" class="retry-button">Retry Connection</button>
             <div class="loading" id="loading">Initializing camera...</div>
@@ -148,113 +174,67 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const videoFeed = document.getElementById('video-feed');
-            const errorMessage = document.getElementById('error-message');
-            const startButton = document.getElementById('start-button');
-            const retryButton = document.getElementById('retry-button');
-            const loading = document.getElementById('loading');
+        const backendUrl = localStorage.getItem('backendUrl') || '';
+        const backendInput = document.getElementById('backend-url-input');
+        const backendStatus = document.getElementById('backend-status');
+        const videoFeed = document.getElementById('video-feed');
+        const startButton = document.getElementById('start-button');
+        const retryButton = document.getElementById('retry-button');
+        const errorMessage = document.getElementById('error-message');
+        const loading = document.getElementById('loading');
 
-            // Get the current port from the window location
-            const port = window.location.port || '8080';
-            const baseUrl = `${window.location.protocol}//${window.location.hostname}:${port}`;
-            
-            let streamActive = false;
+        backendInput.value = backendUrl;
 
-            // Check if the browser supports getUserMedia
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                errorMessage.textContent = 'Your browser does not support camera access.';
+        async function checkBackend() {
+            try {
+                const response = await fetch(`${backendUrl}/check_camera`);
+                const data = await response.json();
+                if (data.status === 'ok') {
+                    backendStatus.textContent = 'Backend: Connected';
+                    backendStatus.className = 'backend-status connected';
+                    return true;
+                }
+            } catch (error) {
+                console.error('Backend check failed:', error);
+            }
+            backendStatus.textContent = 'Backend: Disconnected';
+            backendStatus.className = 'backend-status disconnected';
+            return false;
+        }
+
+        async function startVideo() {
+            if (!backendUrl) {
+                errorMessage.textContent = 'Please enter backend URL first';
                 errorMessage.style.display = 'block';
                 return;
             }
 
-            // Function to check camera status
-            async function checkCamera() {
-                try {
-                    const response = await fetch(`${baseUrl}/check_camera`);
-                    const data = await response.json();
-                    return data.status === 'ok';
-                } catch (error) {
-                    console.error('Error checking camera:', error);
-                    return false;
-                }
-            }
-
-            // Function to start the video feed
-            async function startVideoFeed() {
-                loading.style.display = 'block';
-                startButton.style.display = 'none';
-                retryButton.style.display = 'none';
-                errorMessage.style.display = 'none';
-                
-                try {
-                    // Request camera permission
-                    await navigator.mediaDevices.getUserMedia({ video: true });
-                    
-                    // Check if backend camera is working
-                    const cameraOk = await checkCamera();
-                    
-                    if (cameraOk) {
-                        // Create a new image element each time
-                        const newVideoFeed = document.createElement('img');
-                        newVideoFeed.id = 'video-feed';
-                        newVideoFeed.style.width = '100%';
-                        newVideoFeed.style.maxWidth = '640px';
-                        newVideoFeed.style.borderRadius = '5px';
-                        
-                        // Replace old video feed if it exists
-                        const oldVideoFeed = document.getElementById('video-feed');
-                        if (oldVideoFeed) {
-                            oldVideoFeed.parentNode.removeChild(oldVideoFeed);
-                        }
-                        
-                        // Add the new video feed
-                        document.querySelector('.video-container').appendChild(newVideoFeed);
-                        
-                        // Set up error handling for the new video feed
-                        newVideoFeed.onerror = handleVideoError;
-                        
-                        // Start the stream with a timestamp to prevent caching
-                        newVideoFeed.src = `${baseUrl}/video_feed?t=${Date.now()}`;
-                        newVideoFeed.style.display = 'block';
-                        streamActive = true;
-                    } else {
-                        throw new Error('Could not initialize camera');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    handleVideoError();
-                } finally {
-                    loading.style.display = 'none';
-                }
-            }
-
-            function handleVideoError() {
-                streamActive = false;
-                errorMessage.textContent = 'Could not access camera. Please check your permissions and try again.';
+            const backendAvailable = await checkBackend();
+            if (!backendAvailable) {
+                errorMessage.textContent = 'Cannot connect to backend server';
                 errorMessage.style.display = 'block';
-                retryButton.style.display = 'block';
-                const videoFeed = document.getElementById('video-feed');
-                if (videoFeed) {
-                    videoFeed.style.display = 'none';
-                }
+                return;
             }
 
-            // Show start button initially
-            startButton.style.display = 'block';
-            startButton.addEventListener('click', startVideoFeed);
-            retryButton.addEventListener('click', startVideoFeed);
+            videoFeed.src = `${backendUrl}/video_feed`;
+            videoFeed.style.display = 'block';
+            loading.style.display = 'none';
+            startButton.style.display = 'none';
+        }
 
-            // Periodically check if the stream is still active
-            setInterval(() => {
-                if (streamActive) {
-                    const videoFeed = document.getElementById('video-feed');
-                    if (videoFeed && !videoFeed.complete) {
-                        handleVideoError();
-                    }
-                }
-            }, 5000);
+        backendInput.addEventListener('change', (e) => {
+            const url = e.target.value.trim();
+            localStorage.setItem('backendUrl', url);
+            checkBackend();
         });
+
+        startButton.addEventListener('click', startVideo);
+        retryButton.addEventListener('click', checkBackend);
+
+        // Show backend input in development
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            backendInput.style.display = 'block';
+        }
     </script>
 </body>
 </html> 

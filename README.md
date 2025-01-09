@@ -80,3 +80,15 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details. 
+
+# Deployment Instructions
+
+## Frontend (GitHub Pages)
+1. Enable GitHub Pages in your repository settings
+2. Set the source to the main branch
+3. Your frontend will be available at `https://[username].github.io/OpenCV-ASL-Reader`
+
+## Backend (Heroku Example)
+1. Create a new Heroku app
+2. Add Python buildpack
+3. Deploy the backend: 
